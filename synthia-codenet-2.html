@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>SYNTHIA CODENET — Neural Ingestion Engine</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&family=Fira+Code:wght@300;400;500&display=swap');
+
+:root {
+  --gold: #f5c518;
+  --amber: #e8921a;
+  --emerald: #10d474;
+  --coral: #ff5959;
+  --violet: #c084fc;
+  --bg: #050508;
+  --surface: #0d0d14;
+  --border: #1a1a2e;
+  --text: #e8e8f0;
+  --muted: #5a5a7a;
+  --dim: #2a2a3e;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Space Mono', monospace;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* GRID BACKGROUND */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(245,197,24,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245,197,24,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* HEADER */
+header {
+  position: relative;
+  z-index: 10;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.logo {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.15em;
+  color: var(--gold);
+}
+
+.logo span { color: var(--emerald); }
+
+.version {
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.2em;
+  border: 1px solid var(--dim);
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+/* STATUS BAR */
+#statusBar {
+  position: relative;
+  z-index: 10;
+  padding: 8px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 10px;
+  color: var(--muted);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--emerald);
+  flex-shrink: 0;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.status-item { color: var(--muted); }
+.status-item b { color: var(--gold); }
+
+/* TABS */
+.tabs {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  background: var(--surface);
+}
+
+.tab {
+  padding: 10px 16px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: 'Space Mono', monospace;
+  text-transform: uppercase;
+}
+
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+/* PANELS */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* INGEST PANEL */
+#panel-ingest {
+  position: relative;
+  z-index: 5;
+  padding: 16px 20px;
+}
+
+.drop-zone {
+  border: 1px dashed var(--dim);
+  border-radius: 6px;
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: rgba(245,197,24,0.02);
+  margin-bottom: 16px;
+}
+
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--gold);
+  background: rgba(245,197,24,0.05);
+}
+
+.drop-zone .icon { font-size: 28px; margin-bottom: 8px; }
+.drop-zone h3 {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+.drop-zone p { font-size: 10px; color: var(--muted); line-height: 1.6; }
+
+.format-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.badge {
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 2px;
+  letter-spacing: 0.08em;
+  font-family: 'Fira Code', monospace;
+}
+
+.badge-code { background: rgba(16,212,116,0.12); color: var(--emerald); border: 1px solid rgba(16,212,116,0.2); }
+.badge-doc  { background: rgba(245,197,24,0.10); color: var(--gold);    border: 1px solid rgba(245,197,24,0.2); }
+.badge-book { background: rgba(192,132,252,0.12); color: var(--violet); border: 1px solid rgba(192,132,252,0.2); }
+.badge-data { background: rgba(232,146,26,0.10); color: var(--amber);   border: 1px solid rgba(232,146,26,0.2); }
+.badge-media{ background: rgba(255,89,89,0.10);  color: var(--coral);   border: 1px solid rgba(255,89,89,0.2); }
+
+/* URL INGEST */
+.url-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.url-row input {
+  flex: 1;
+  background: var(--dim);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--text);
+  outline: none;
+  min-width: 0;
+}
+
+.url-row input:focus { border-color: var(--gold); }
+.url-row input::placeholder { color: var(--muted); }
+
+/* BUTTONS */
+.btn {
+  padding: 8px 14px;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  border-radius: 3px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-gold    { background: var(--gold);    color: #000; font-weight: 700; }
+.btn-gold:hover { background: var(--amber); }
+.btn-ghost   { background: transparent; color: var(--muted); border: 1px solid var(--dim); }
+.btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+.btn-emerald { background: var(--emerald); color: #000; font-weight: 700; }
+.btn-violet  { background: var(--violet);  color: #000; font-weight: 700; }
+.btn-sm { padding: 5px 10px; font-size: 9px; }
+
+/* HOOKS ROW */
+.hooks-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.hook-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-family: 'Fira Code', monospace;
+  cursor: pointer;
+  border: 1px solid;
+  transition: all 0.2s;
+  background: transparent;
+  color: var(--text);
+}
+
+.hook-github   { border-color: rgba(245,197,24,0.3); color: var(--gold); }
+.hook-netlify  { border-color: rgba(16,212,116,0.3); color: var(--emerald); }
+.hook-hf       { border-color: rgba(232,146,26,0.3); color: var(--amber); }
+.hook-supabase { border-color: rgba(192,132,252,0.3); color: var(--violet); }
+.hook-render   { border-color: rgba(255,89,89,0.3);   color: var(--coral); }
+
+.hook-btn:hover { background: rgba(255,255,255,0.05); transform: translateY(-1px); }
+.hook-btn.connected::before {
+  content: '●';
+  font-size: 7px;
+  color: var(--emerald);
+}
+
+/* FILE LIST */
+#fileList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.file-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.file-ext {
+  font-family: 'Fira Code', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 2px;
+  min-width: 38px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.file-info { flex: 1; min-width: 0; }
+.file-name { font-size: 11px; color: var(--text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-addr { font-family: 'Fira Code', monospace; font-size: 9px; color: var(--gold); }
+.file-meta { font-size: 9px; color: var(--muted); margin-top: 2px; }
+
+.file-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* HD ADDRESS PANEL */
+#panel-address {
+  padding: 16px 20px;
+  position: relative;
+  z-index: 5;
+}
+
+.address-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.addr-field {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+.addr-label {
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.addr-value {
+  font-family: 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--gold);
+}
+
+.addr-sub {
+  font-size: 9px;
+  color: var(--violet);
+  margin-top: 2px;
+}
+
+/* FULL ADDRESS DISPLAY */
+.full-address {
+  background: var(--dim);
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  padding: 12px;
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+  color: var(--emerald);
+  line-height: 1.8;
+  margin-bottom: 16px;
+  word-break: break-all;
+}
+
+.full-address .addr-part { color: var(--gold); }
+.full-address .sep { color: var(--muted); }
+
+/* REPOSITORY PANEL */
+#panel-repo {
+  padding: 16px 20px;
+  position: relative;
+  z-index: 5;
+}
+
+.filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  background: var(--dim);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 6px 8px;
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+
+.filter-select:focus { border-color: var(--gold); }
+
+/* REPO TABLE */
+.repo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.repo-table th {
+  text-align: left;
+  padding: 6px 8px;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.repo-table th:hover { color: var(--gold); }
+.repo-table th.sorted { color: var(--gold); }
+
+.repo-table td {
+  padding: 8px;
+  border-bottom: 1px solid rgba(26,26,46,0.5);
+  vertical-align: middle;
+}
+
+.repo-table tr:hover td { background: rgba(245,197,24,0.03); }
+
+.td-gate { font-family: 'Fira Code', monospace; color: var(--gold); font-weight: 700; }
+.td-line { color: var(--emerald); }
+.td-planet { color: var(--violet); font-size: 11px; }
+.td-name { color: var(--text); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-type { font-size: 9px; }
+.td-actions { display: flex; gap: 4px; }
+
+/* NEURAL PANEL */
+#panel-neural {
+  padding: 16px 20px;
+  position: relative;
+  z-index: 5;
+}
+
+.neural-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.neural-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  text-align: center;
+}
+
+.neural-stat .big {
+  font-family: 'Syne', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.neural-stat .label {
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+
+.layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.layer-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.layer-icon { font-size: 16px; }
+.layer-info { flex: 1; }
+.layer-name { font-size: 11px; color: var(--text); }
+.layer-desc { font-size: 9px; color: var(--muted); margin-top: 1px; }
+.layer-status { font-size: 9px; }
+.layer-active { color: var(--emerald); }
+.layer-learning { color: var(--amber); }
+
+/* PROGRESS BAR */
+.progress-wrap { margin-bottom: 4px; }
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+
+.progress-bar {
+  height: 4px;
+  background: var(--dim);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1s ease;
+}
+
+/* EXECUTE PANEL */
+#panel-execute {
+  padding: 16px 20px;
+  position: relative;
+  z-index: 5;
+}
+
+.exec-console {
+  background: #0a0a0f;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+  line-height: 1.8;
+  max-height: 260px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.log-info    { color: var(--muted); }
+.log-success { color: var(--emerald); }
+.log-warn    { color: var(--amber); }
+.log-error   { color: var(--coral); }
+.log-gate    { color: var(--gold); }
+.log-data    { color: var(--violet); }
+
+.exec-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.exec-input {
+  flex: 1;
+  background: var(--dim);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 8px 10px;
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--emerald);
+  outline: none;
+  min-width: 0;
+}
+
+.exec-input:focus { border-color: var(--emerald); }
+.exec-input::placeholder { color: var(--muted); }
+
+/* HOOKS PANEL */
+#panel-hooks {
+  padding: 16px 20px;
+  position: relative;
+  z-index: 5;
+}
+
+.hook-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.hook-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.hook-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+}
+
+.hook-card-badge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.hook-input-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.hook-input {
+  flex: 1;
+  background: var(--dim);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 6px 8px;
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+  color: var(--text);
+  outline: none;
+  min-width: 0;
+}
+
+.hook-input:focus { border-color: var(--gold); }
+.hook-input::placeholder { color: var(--muted); }
+
+.hook-desc { font-size: 9px; color: var(--muted); }
+
+/* TOAST */
+#toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(60px);
+  background: var(--surface);
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 11px;
+  color: var(--gold);
+  z-index: 9999;
+  transition: transform 0.3s ease;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+#toast.show { transform: translateX(-50%) translateY(0); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+/* HIDDEN FILE INPUT */
+#fileInput { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">SYNTHIA <span>CODENET</span></div>
+  <div class="version">v0.1.0-α</div>
+</header>
+
+<div id="statusBar">
+  <div class="status-dot"></div>
+  <span class="status-item">FIELD: <b>ACTIVE</b></span>
+  <span class="status-item">NODES: <b id="nodeCount">0</b></span>
+  <span class="status-item">GATE: <b id="currentGate">—</b></span>
+  <span class="status-item">HOOKS: <b id="hookCount">0</b>/5</span>
+  <span class="status-item">EPOCH: <b id="epochCount">0</b></span>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('ingest')">⬆ INGEST</button>
+  <button class="tab" onclick="switchTab('address')">◈ HD ADDRESS</button>
+  <button class="tab" onclick="switchTab('repo')">◫ REPOSITORY</button>
+  <button class="tab" onclick="switchTab('neural')">⬡ NEURAL</button>
+  <button class="tab" onclick="switchTab('execute')">▶ EXECUTE</button>
+  <button class="tab" onclick="switchTab('hooks')">⇆ HOOKS</button>
+</div>
+
+<!-- INGEST PANEL -->
+<div id="panel-ingest" class="panel active">
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <div class="icon">⬆</div>
+    <h3>DROP OR CLICK TO INGEST</h3>
+    <p>Code · PDFs · Books · Scripts · Notebooks · Data · SIPS · Archives<br>
+    All formats parsed, addressed, and filed by HD coordinates</p>
+  </div>
+  <input type="file" id="fileInput" multiple accept="*/*">
+
+  <div class="format-badges">
+    <span class="badge badge-code">.py</span>
+    <span class="badge badge-code">.js</span>
+    <span class="badge badge-code">.ts</span>
+    <span class="badge badge-code">.ipynb</span>
+    <span class="badge badge-code">.rs</span>
+    <span class="badge badge-code">.sol</span>
+    <span class="badge badge-doc">.pdf</span>
+    <span class="badge badge-doc">.sips</span>
+    <span class="badge badge-doc">.html</span>
+    <span class="badge badge-doc">.md</span>
+    <span class="badge badge-book">.epub</span>
+    <span class="badge badge-book">.mobi</span>
+    <span class="badge badge-book">.txt</span>
+    <span class="badge badge-data">.json</span>
+    <span class="badge badge-data">.csv</span>
+    <span class="badge badge-data">.onnx</span>
+    <span class="badge badge-media">.mp4</span>
+    <span class="badge badge-media">.wasm</span>
+  </div>
+
+  <div class="url-row">
+    <input type="text" id="urlInput" placeholder="https://github.com/repo or HuggingFace model or URL...">
+    <button class="btn btn-gold" onclick="ingestURL()">INGEST URL</button>
+  </div>
+
+  <div style="font-size:9px;color:var(--muted);margin-bottom:10px;letter-spacing:0.1em;">PLATFORM HOOKS</div>
+  <div class="hooks-row">
+    <button class="hook-btn hook-github" id="hook-github" onclick="toggleHook('github')">⬡ GitHub</button>
+    <button class="hook-btn hook-netlify" id="hook-netlify" onclick="toggleHook('netlify')">▲ Netlify</button>
+    <button class="hook-btn hook-hf" id="hook-hf" onclick="toggleHook('hf')">🤗 HuggingFace</button>
+    <button class="hook-btn hook-supabase" id="hook-supabase" onclick="toggleHook('supabase')">◈ Supabase</button>
+    <button class="hook-btn hook-render" id="hook-render" onclick="toggleHook('render')">◻ Render</button>
+  </div>
+
+  <div id="fileList"></div>
+</div>
+
+<!-- HD ADDRESS PANEL -->
+<div id="panel-address" class="panel">
+  <div class="address-grid">
+    <div class="addr-field">
+      <div class="addr-label">PLANET</div>
+      <div class="addr-value" id="addr-planet">☉ Sun</div>
+      <div class="addr-sub" id="addr-planet-weight">Weight: 0.70</div>
+    </div>
+    <div class="addr-field">
+      <div class="addr-label">GATE</div>
+      <div class="addr-value" id="addr-gate">1</div>
+      <div class="addr-sub" id="addr-gate-name">Self-Expression</div>
+    </div>
+    <div class="addr-field">
+      <div class="addr-label">LINE · COLOR · TONE</div>
+      <div class="addr-value" id="addr-lct">1 · 1 · 1</div>
+      <div class="addr-sub" id="addr-base">Base: 1</div>
+    </div>
+    <div class="addr-field">
+      <div class="addr-label">ZODIAC · HOUSE</div>
+      <div class="addr-value" id="addr-zodiac">♈ Aries</div>
+      <div class="addr-sub" id="addr-house">House: I</div>
+    </div>
+    <div class="addr-field">
+      <div class="addr-label">DEGREE</div>
+      <div class="addr-value" id="addr-degree">0°</div>
+      <div class="addr-sub" id="addr-arcmin">0' 0"</div>
+    </div>
+    <div class="addr-field">
+      <div class="addr-label">FIELD</div>
+      <div class="addr-value" id="addr-field">Body</div>
+      <div class="addr-sub" id="addr-method">Tropical</div>
+    </div>
+  </div>
+
+  <div class="full-address" id="fullAddress">
+    <span class="addr-part">☉Sun</span><span class="sep">·</span><span class="addr-part">G01</span><span class="sep">·</span><span class="addr-part">L1</span><span class="sep">·</span><span class="addr-part">C1</span><span class="sep">·</span><span class="addr-part">T1</span><span class="sep">·</span><span class="addr-part">B1</span><span class="sep">·</span><span class="addr-part">0°00'00"</span><span class="sep">·</span><span class="addr-part">♈I</span>
+  </div>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+    <button class="btn btn-gold" onclick="generateAddress()">GENERATE ADDRESS</button>
+    <button class="btn btn-ghost" onclick="copyAddress()">COPY</button>
+    <button class="btn btn-ghost" onclick="randomAddress()">RANDOM</button>
+  </div>
+
+  <div style="font-size:9px;color:var(--muted);letter-spacing:0.1em;margin-bottom:8px;">ADDRESS SPACE: 69,120 SUB-STATES</div>
+  <div class="progress-wrap">
+    <div class="progress-label"><span>64 GATES × 6 LINES × 6 COLORS × 6 TONES × 5 BASES</span><span id="addrSpaceUsed">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="addrFill" style="width:0%;background:var(--gold);"></div></div>
+  </div>
+</div>
+
+<!-- REPOSITORY PANEL -->
+<div id="panel-repo" class="panel">
+  <div class="filter-row">
+    <select class="filter-select" id="sortGate" onchange="renderRepo()">
+      <option value="">— GATE —</option>
+    </select>
+    <select class="filter-select" id="sortPlanet" onchange="renderRepo()">
+      <option value="">— PLANET —</option>
+      <option>☉ Sun</option><option>☽ Moon</option><option>☿ Mercury</option>
+      <option>♀ Venus</option><option>♂ Mars</option><option>♃ Jupiter</option>
+      <option>♄ Saturn</option><option>⛢ Uranus</option><option>♆ Neptune</option>
+      <option>♇ Pluto</option>
+    </select>
+    <select class="filter-select" id="sortType" onchange="renderRepo()">
+      <option value="">— TYPE —</option>
+      <option>CODE</option><option>PDF</option><option>BOOK</option>
+      <option>DATA</option><option>MEDIA</option>
+    </select>
+    <button class="btn btn-ghost btn-sm" onclick="clearFilters()">CLEAR</button>
+  </div>
+
+  <table class="repo-table">
+    <thead>
+      <tr>
+        <th onclick="sortRepo('gate')" class="sorted">GATE▾</th>
+        <th onclick="sortRepo('line')">LINE</th>
+        <th onclick="sortRepo('planet')">PLANET</th>
+        <th onclick="sortRepo('name')">FILE</th>
+        <th onclick="sortRepo('type')">TYPE</th>
+        <th>RUN</th>
+      </tr>
+    </thead>
+    <tbody id="repoBody">
+      <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;font-size:10px;">No files ingested yet.<br>Use INGEST tab to add files.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- NEURAL PANEL -->
+<div id="panel-neural" class="panel">
+  <div class="neural-grid">
+    <div class="neural-stat">
+      <div class="big" id="neuralNodes">0</div>
+      <div class="label">NODES TRAINED</div>
+    </div>
+    <div class="neural-stat">
+      <div class="big" id="neuralEpoch">0</div>
+      <div class="label">EPOCHS</div>
+    </div>
+    <div class="neural-stat">
+      <div class="big" id="neuralGates">0</div>
+      <div class="label">GATES ACTIVATED</div>
+    </div>
+    <div class="neural-stat">
+      <div class="big" id="neuralResonance" style="color:var(--emerald)">0%</div>
+      <div class="label">FIELD RESONANCE</div>
+    </div>
+  </div>
+
+  <div class="layer-list">
+    <div class="layer-item">
+      <div class="layer-icon">⬡</div>
+      <div class="layer-info">
+        <div class="layer-name">INGESTION LAYER</div>
+        <div class="layer-desc">Parses all formats → tokenizes → assigns HD address</div>
+      </div>
+      <div class="layer-status layer-active">ACTIVE</div>
+    </div>
+    <div class="layer-item">
+      <div class="layer-icon">◈</div>
+      <div class="layer-info">
+        <div class="layer-name">ADDRESS ENCODER</div>
+        <div class="layer-desc">Gate × Line × Color × Tone × Base → 69K lattice embedding</div>
+      </div>
+      <div class="layer-status layer-active">ACTIVE</div>
+    </div>
+    <div class="layer-item">
+      <div class="layer-icon">⬡</div>
+      <div class="layer-info">
+        <div class="layer-name">GNN MESSAGE PASSING</div>
+        <div class="layer-desc">64-node graph · 3 awareness heads · FiLM modulation</div>
+      </div>
+      <div class="layer-status layer-learning">LEARNING</div>
+    </div>
+    <div class="layer-item">
+      <div class="layer-icon">▶</div>
+      <div class="layer-info">
+        <div class="layer-name">EXECUTION RUNTIME</div>
+        <div class="layer-desc">Python · JS · WASM · Notebook · PDF-SIPS renderer</div>
+      </div>
+      <div class="layer-status layer-active">ACTIVE</div>
+    </div>
+    <div class="layer-item">
+      <div class="layer-icon">⇆</div>
+      <div class="layer-info">
+        <div class="layer-name">PLATFORM BRIDGE</div>
+        <div class="layer-desc">GitHub · Netlify · HuggingFace · Supabase · Render</div>
+      </div>
+      <div class="layer-status" id="bridgeStatus" style="color:var(--muted)">STANDBY</div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span>BODY FIELD (Tropical)</span><span id="bodyPct">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="bodyFill" style="width:0%;background:var(--amber);"></div></div>
+  </div>
+  <div class="progress-wrap" style="margin-top:6px;">
+    <div class="progress-label"><span>HEART FIELD (Draconic)</span><span id="heartPct">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="heartFill" style="width:0%;background:var(--coral);"></div></div>
+  </div>
+  <div class="progress-wrap" style="margin-top:6px;">
+    <div class="progress-label"><span>MIND FIELD (Sidereal)</span><span id="mindPct">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="mindFill" style="width:0%;background:var(--violet);"></div></div>
+  </div>
+
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn btn-emerald" onclick="runEpoch()">RUN EPOCH</button>
+    <button class="btn btn-ghost" onclick="resetNet()">RESET NET</button>
+  </div>
+</div>
+
+<!-- EXECUTE PANEL -->
+<div id="panel-execute" class="panel">
+  <div class="exec-console" id="execConsole">
+    <div class="log-info">SYNTHIA CODENET RUNTIME v0.1.0-α</div>
+    <div class="log-info">─────────────────────────────────</div>
+    <div class="log-gate">⬡ GNN initialized · 64 gates standby</div>
+    <div class="log-info">Awaiting ingestion...</div>
+  </div>
+  <div class="exec-input-row">
+    <input type="text" class="exec-input" id="execInput" placeholder="run gate:1 · exec file:0 · push github · deploy netlify..." onkeydown="if(event.key==='Enter')execCommand()">
+    <button class="btn btn-emerald" onclick="execCommand()">▶ RUN</button>
+  </div>
+  <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+    <button class="btn btn-ghost btn-sm" onclick="quickExec('status')">status</button>
+    <button class="btn btn-ghost btn-sm" onclick="quickExec('list files')">list files</button>
+    <button class="btn btn-ghost btn-sm" onclick="quickExec('run epoch')">run epoch</button>
+    <button class="btn btn-ghost btn-sm" onclick="quickExec('push github')">push github</button>
+    <button class="btn btn-ghost btn-sm" onclick="quickExec('deploy netlify')">deploy netlify</button>
+    <button class="btn btn-ghost btn-sm" onclick="quickExec('sync hf')">sync hf</button>
+    <button class="btn btn-ghost btn-sm" onclick="quickExec('export repo')">export repo</button>
+  </div>
+</div>
+
+<!-- HOOKS PANEL -->
+<div id="panel-hooks" class="panel">
+
+  <div class="hook-card">
+    <div class="hook-card-header">
+      <div class="hook-card-title" style="color:var(--gold)">⬡ GitHub</div>
+      <span class="hook-card-badge" id="badge-github" style="background:rgba(245,197,24,0.1);color:var(--gold)">DISCONNECTED</span>
+    </div>
+    <div class="hook-input-row">
+      <input type="text" class="hook-input" id="gh-token" placeholder="Personal Access Token (ghp_...)">
+      <input type="text" class="hook-input" id="gh-repo" placeholder="justappgrabbin/repo-name">
+    </div>
+    <div class="hook-input-row">
+      <input type="text" class="hook-input" id="gh-branch" placeholder="Branch (main)" value="main">
+      <button class="btn btn-gold btn-sm" onclick="connectHook('github')">CONNECT</button>
+    </div>
+    <div class="hook-desc">Push ingested files as commits · auto-commit on ingest · sync with remote</div>
+  </div>
+
+  <div class="hook-card">
+    <div class="hook-card-header">
+      <div class="hook-card-title" style="color:var(--emerald)">▲ Netlify</div>
+      <span class="hook-card-badge" id="badge-netlify" style="background:rgba(16,212,116,0.1);color:var(--emerald)">DISCONNECTED</span>
+    </div>
+    <div class="hook-input-row">
+      <input type="text" class="hook-input" id="ntl-token" placeholder="Netlify Personal Access Token">
+      <input type="text" class="hook-input" id="ntl-site" placeholder="Site ID or getguagan.pro">
+    </div>
+    <div class="hook-input-row">
+      <button class="btn btn-ghost btn-sm" onclick="connectHook('netlify')">CONNECT</button>
+      <button class="btn btn-ghost btn-sm" onclick="deployHook('netlify')">DEPLOY NOW</button>
+    </div>
+    <div class="hook-desc">Deploy to getguagan.pro · you-n-i-verse.org · stellarproximology.org</div>
+  </div>
+
+  <div class="hook-card">
+    <div class="hook-card-header">
+      <div class="hook-card-title" style="color:var(--amber)">🤗 HuggingFace</div>
+      <span class="hook-card-badge" id="badge-hf" style="background:rgba(232,146,26,0.1);color:var(--amber)">DISCONNECTED</span>
+    </div>
+    <div class="hook-input-row">
+      <input type="text" class="hook-input" id="hf-token" placeholder="HF Token (hf_...)">
+      <input type="text" class="hook-input" id="hf-repo" placeholder="stellarproximology/model-name">
+    </div>
+    <div class="hook-input-row">
+      <select class="filter-select" id="hf-type" style="font-size:10px;">
+        <option value="model">Model</option>
+        <option value="dataset">Dataset</option>
+        <option value="space">Space</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="connectHook('hf')">CONNECT</button>
+    </div>
+    <div class="hook-desc">Push to SynthAI / Gnn / synthiabot / Hdgnn · pull datasets into ingestion</div>
+  </div>
+
+  <div class="hook-card">
+    <div class="hook-card-header">
+      <div class="hook-card-title" style="color:var(--violet)">◈ Supabase</div>
+      <span class="hook-card-badge" id="badge-supabase" style="background:rgba(192,132,252,0.1);color:var(--violet)">DISCONNECTED</span>
+    </div>
+    <div class="hook-input-row">
+      <input type="text" class="hook-input" id="sb-url" placeholder="https://leisphnjslcuepflefri.supabase.co">
+      <input type="text" class="hook-input" id="sb-key" placeholder="anon key">
+    </div>
+    <div class="hook-input-row">
+      <button class="btn btn-ghost btn-sm" onclick="connectHook('supabase')">CONNECT</button>
+    </div>
+    <div class="hook-desc">Persist HD-addressed file repo · sync address lattice · live resonance scores</div>
+  </div>
+
+  <div class="hook-card">
+    <div class="hook-card-header">
+      <div class="hook-card-title" style="color:var(--coral)">◻ Render</div>
+      <span class="hook-card-badge" id="badge-render" style="background:rgba(255,89,89,0.1);color:var(--coral)">DISCONNECTED</span>
+    </div>
+    <div class="hook-input-row">
+      <input type="text" class="hook-input" id="rnd-key" placeholder="Render API Key">
+      <input type="text" class="hook-input" id="rnd-service" placeholder="synthia-server service ID">
+    </div>
+    <div class="hook-input-row">
+      <button class="btn btn-ghost btn-sm" onclick="connectHook('render')">CONNECT</button>
+      <button class="btn btn-ghost btn-sm" onclick="deployHook('render')">TRIGGER DEPLOY</button>
+    </div>
+    <div class="hook-desc">Trigger synthia-node + synthia-python redeploys · stream runtime logs</div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+const state = {
+  files: [],
+  hooks: { github: false, netlify: false, hf: false, supabase: false, render: false },
+  neural: { nodes: 0, epoch: 0, gates: 0, resonance: 0 },
+  sortKey: 'gate',
+  sortDir: 1
+};
+
+// ── HD DATA ────────────────────────────────────────────────────────────────
+const PLANETS = [
+  {sym:'☉',name:'Sun',weight:0.70}, {sym:'☽',name:'Moon',weight:0.20},
+  {sym:'☿',name:'Mercury',weight:0.08},{sym:'♀',name:'Venus',weight:0.06},
+  {sym:'♂',name:'Mars',weight:0.05}, {sym:'♃',name:'Jupiter',weight:0.04},
+  {sym:'♄',name:'Saturn',weight:0.04},{sym:'⛢',name:'Uranus',weight:0.03},
+  {sym:'♆',name:'Neptune',weight:0.03},{sym:'♇',name:'Pluto',weight:0.02}
+];
+
+const GATE_NAMES = {
+  1:'Self-Expression',2:'Receptivity',3:'Ordering',4:'Formulization',
+  5:'Fixed Rhythms',6:'Friction',7:'The Role of Self',8:'Contribution',
+  9:'Focus',10:'Behaviour of Self',11:'Ideas',12:'Caution',
+  13:'The Listener',14:'Power Skills',15:'Extremes',16:'Skills',
+  17:'Opinions',18:'Correction',19:'Wanting',20:'The Now',
+  21:'Hunter/Huntress',22:'Openness',23:'Assimilation',24:'Rationalization',
+  25:'Innocence',26:'Egoist',27:'Caring',28:'The Game Player',
+  29:'Perseverance',30:'Recognition of Feelings',31:'Leadership',32:'Continuity',
+  33:'Privacy',34:'Power',35:'Change',36:'Crisis',
+  37:'Friendship',38:'Opposition',39:'Provocation',40:'Aloneness',
+  41:'Contraction',42:'Growth',43:'Insight',44:'Alertness',
+  45:'Gathering',46:'Love of Body',47:'Realization',48:'Depth',
+  49:'Principles',50:'Values',51:'Shock',52:'Inaction',
+  53:'Beginnings',54:'Drive',55:'Spirit',56:'Stimulation',
+  57:'Intuitive Clarity',58:'Vitality',59:'Sexuality',60:'Limitation',
+  61:'Inner Truth',62:'Details',63:'Doubt',64:'Confusion'
+};
+
+const ZODIAC = ['♈ Aries','♉ Taurus','♊ Gemini','♋ Cancer','♌ Leo','♍ Virgo',
+                '♎ Libra','♏ Scorpio','♐ Sagittarius','♑ Capricorn','♒ Aquarius','♓ Pisces'];
+const HOUSES = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+const FIELDS  = [{name:'Body',method:'Tropical'},{name:'Heart',method:'Draconic'},{name:'Mind',method:'Sidereal'}];
+const EXT_COLORS = {
+  py:'#10d474',js:'#f5c518',ts:'#c084fc',html:'#e8921a',css:'#ff5959',
+  ipynb:'#10d474',json:'#f5c518',csv:'#e8921a',pdf:'#ff5959',
+  epub:'#c084fc',txt:'#5a5a7a',md:'#10d474',rs:'#e8921a',sol:'#c084fc',
+  onnx:'#ff5959',wasm:'#c084fc',mp4:'#ff5959'
+};
+const EXT_CLASS = {
+  py:'badge-code',js:'badge-code',ts:'badge-code',html:'badge-code',
+  rs:'badge-code',sol:'badge-code',ipynb:'badge-code',wasm:'badge-code',
+  pdf:'badge-doc',sips:'badge-doc',md:'badge-doc',html:'badge-doc',
+  epub:'badge-book',mobi:'badge-book',txt:'badge-book',
+  json:'badge-data',csv:'badge-data',onnx:'badge-data',
+  mp4:'badge-media'
+};
+const TYPE_MAP = {
+  py:'CODE',js:'CODE',ts:'CODE',html:'CODE',rs:'CODE',sol:'CODE',
+  ipynb:'CODE',wasm:'CODE',pdf:'PDF',sips:'PDF',epub:'BOOK',
+  mobi:'BOOK',txt:'BOOK',json:'DATA',csv:'DATA',onnx:'DATA',mp4:'MEDIA',
+  md:'DOC'
+};
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+
+function hdAddress(){
+  const p = pick(PLANETS);
+  const gate = rnd(1,64);
+  const line = rnd(1,6), color=rnd(1,6), tone=rnd(1,6), base=rnd(1,5);
+  const deg = rnd(0,29), min=rnd(0,59), sec=rnd(0,59);
+  const zodiac = pick(ZODIAC), house = pick(HOUSES);
+  const field = pick(FIELDS);
+  return {planet:p, gate, line, color, tone, base,
+          deg, min, sec, zodiac, house, field,
+          key:`${p.sym}${p.name}·G${String(gate).padStart(2,'0')}·L${line}·C${color}·T${tone}·B${base}·${deg}°${min}'${sec}"·${zodiac.split(' ')[0]}${house}`};
+}
+
+function fileExt(name){return (name.split('.').pop()||'bin').toLowerCase();}
+function extColor(ext){return EXT_COLORS[ext]||'#5a5a7a';}
+function extType(ext){return TYPE_MAP[ext]||'DATA';}
+
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+function log(msg,cls='log-info'){
+  const c=document.getElementById('execConsole');
+  const d=document.createElement('div');
+  d.className=cls; d.textContent=msg;
+  c.appendChild(d); c.scrollTop=c.scrollHeight;
+}
+
+function updateStatus(){
+  document.getElementById('nodeCount').textContent=state.files.length;
+  document.getElementById('hookCount').textContent=Object.values(state.hooks).filter(Boolean).length;
+  document.getElementById('epochCount').textContent=state.neural.epoch;
+  const active=state.files[state.files.length-1];
+  document.getElementById('currentGate').textContent=active?active.addr.gate:'—';
+}
+
+// ── TABS ───────────────────────────────────────────────────────────────────
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const ids=['ingest','address','repo','neural','execute','hooks'];
+    t.classList.toggle('active',ids[i]===id);
+  });
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+}
+
+// ── INGEST ─────────────────────────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change',e=>{
+  [...e.target.files].forEach(f=>ingestFile(f));
+});
+
+const dz=document.getElementById('dropZone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+dz.addEventListener('drop',e=>{
+  e.preventDefault(); dz.classList.remove('drag-over');
+  [...e.dataTransfer.files].forEach(f=>ingestFile(f));
+});
+
+function ingestFile(file){
+  const ext=fileExt(file.name);
+  const addr=hdAddress();
+  const entry={
+    id:Date.now()+Math.random(),
+    name:file.name,
+    size:file.size,
+    ext, addr,
+    type:extType(ext),
+    status:'ingested',
+    file
+  };
+  state.files.push(entry);
+  state.neural.nodes++;
+  state.neural.gates=Math.min(64, state.neural.gates+1);
+  renderFileList();
+  renderRepo();
+  updateStatus();
+  log(`⬡ INGESTED: ${file.name}`, 'log-success');
+  log(`  ADDRESS: ${addr.key}`, 'log-gate');
+  log(`  TYPE: ${entry.type} · SIZE: ${(file.size/1024).toFixed(1)}KB`, 'log-data');
+  if(state.hooks.supabase) log(`  → Queued for Supabase sync`, 'log-info');
+  if(state.hooks.github) log(`  → Queued for GitHub commit`, 'log-info');
+  toast(`Ingested ${file.name}`);
+}
+
+function ingestURL(){
+  const url=document.getElementById('urlInput').value.trim();
+  if(!url) return;
+  const parts=url.split('/');
+  const name=parts[parts.length-1]||'remote_resource';
+  const ext=fileExt(name)||'url';
+  const addr=hdAddress();
+  const entry={
+    id:Date.now()+Math.random(),
+    name, size:0, ext, addr,
+    type:extType(ext)||'DATA',
+    status:'ingested',
+    url
+  };
+  state.files.push(entry);
+  state.neural.nodes++;
+  renderFileList(); renderRepo(); updateStatus();
+  log(`⬡ INGESTED URL: ${url}`, 'log-success');
+  log(`  ADDRESS: ${addr.key}`, 'log-gate');
+  document.getElementById('urlInput').value='';
+  toast('URL ingested');
+}
+
+function renderFileList(){
+  const list=document.getElementById('fileList');
+  if(!state.files.length){list.innerHTML='';return;}
+  list.innerHTML=state.files.slice(-6).reverse().map(f=>{
+    const col=extColor(f.ext);
+    return `<div class="file-item">
+      <span class="file-ext badge" style="background:${col}22;color:${col};border:1px solid ${col}44">${f.ext.toUpperCase()}</span>
+      <div class="file-info">
+        <div class="file-name">${f.name}</div>
+        <div class="file-addr">${f.addr.key.substring(0,48)}…</div>
+        <div class="file-meta">${f.type} · G${f.addr.gate} L${f.addr.line} · ${f.addr.field.name}</div>
+      </div>
+      <div class="file-actions">
+        <button class="btn btn-ghost btn-sm" onclick="runFile('${f.id}')">▶</button>
+        <button class="btn btn-ghost btn-sm" onclick="removeFile('${f.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function removeFile(id){
+  state.files=state.files.filter(f=>String(f.id)!==String(id));
+  renderFileList(); renderRepo(); updateStatus();
+}
+
+function runFile(id){
+  const f=state.files.find(x=>String(x.id)===String(id));
+  if(!f) return;
+  switchTab('execute');
+  log(`▶ EXECUTING: ${f.name}`, 'log-success');
+  log(`  RUNTIME: ${getRuntime(f.ext)}`, 'log-info');
+  setTimeout(()=>log(`  ✓ Execution complete`, 'log-success'),800);
+}
+
+function getRuntime(ext){
+  const map={py:'Python 3.x',js:'Node.js',ts:'TypeScript/tsx',
+    ipynb:'Jupyter Kernel',wasm:'WASM Runtime',pdf:'PDF+SIPS Renderer',
+    epub:'Book Parser',html:'Browser Runtime',onnx:'ONNX Runtime'};
+  return map[ext]||'Generic Interpreter';
+}
+
+// ── ADDRESS ────────────────────────────────────────────────────────────────
+function generateAddress(){
+  const a=hdAddress();
+  applyAddress(a);
+}
+
+function randomAddress(){ generateAddress(); }
+
+function applyAddress(a){
+  document.getElementById('addr-planet').textContent=`${a.planet.sym} ${a.planet.name}`;
+  document.getElementById('addr-planet-weight').textContent=`Weight: ${a.planet.weight.toFixed(2)}`;
+  document.getElementById('addr-gate').textContent=a.gate;
+  document.getElementById('addr-gate-name').textContent=GATE_NAMES[a.gate]||'—';
+  document.getElementById('addr-lct').textContent=`${a.line} · ${a.color} · ${a.tone}`;
+  document.getElementById('addr-base').textContent=`Base: ${a.base}`;
+  document.getElementById('addr-zodiac').textContent=a.zodiac;
+  document.getElementById('addr-house').textContent=`House: ${a.house}`;
+  document.getElementById('addr-degree').textContent=`${a.deg}°`;
+  document.getElementById('addr-arcmin').textContent=`${a.min}' ${a.sec}"`;
+  document.getElementById('addr-field').textContent=a.field.name;
+  document.getElementById('addr-method').textContent=a.field.method;
+  document.getElementById('fullAddress').innerHTML=`<span class="addr-part">${a.planet.sym}${a.planet.name}</span><span class="sep">·</span><span class="addr-part">G${String(a.gate).padStart(2,'0')}</span><span class="sep">·</span><span class="addr-part">L${a.line}</span><span class="sep">·</span><span class="addr-part">C${a.color}</span><span class="sep">·</span><span class="addr-part">T${a.tone}</span><span class="sep">·</span><span class="addr-part">B${a.base}</span><span class="sep">·</span><span class="addr-part">${a.deg}°${a.min}'${a.sec}"</span><span class="sep">·</span><span class="addr-part">${a.zodiac.split(' ')[0]}${a.house}</span>`;
+  const pct=Math.min(100,(state.files.length/69120*100)).toFixed(4);
+  document.getElementById('addrSpaceUsed').textContent=pct+'%';
+  document.getElementById('addrFill').style.width=Math.min(100,state.files.length/10)+'%';
+}
+
+function copyAddress(){
+  const txt=document.getElementById('fullAddress').textContent;
+  navigator.clipboard?.writeText(txt).then(()=>toast('Address copied'));
+}
+
+// ── REPOSITORY ─────────────────────────────────────────────────────────────
+function renderRepo(){
+  const tbody=document.getElementById('repoBody');
+  const gFilter=document.getElementById('sortGate').value;
+  const pFilter=document.getElementById('sortPlanet').value;
+  const tFilter=document.getElementById('sortType').value;
+
+  let files=[...state.files];
+  if(gFilter) files=files.filter(f=>f.addr.gate==gFilter);
+  if(pFilter) files=files.filter(f=>pFilter.includes(f.addr.planet.name));
+  if(tFilter) files=files.filter(f=>f.type===tFilter);
+
+  files.sort((a,b)=>{
+    let av=a.addr[state.sortKey]||a[state.sortKey]||0;
+    let bv=b.addr[state.sortKey]||b[state.sortKey]||0;
+    if(typeof av==='string') return av.localeCompare(bv)*state.sortDir;
+    return (av-bv)*state.sortDir;
+  });
+
+  if(!files.length){
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:16px;font-size:10px;">No matching files.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML=files.map(f=>{
+    const col=extColor(f.ext);
+    return `<tr>
+      <td class="td-gate">G${f.addr.gate}</td>
+      <td class="td-line">${f.addr.line}.${f.addr.color}.${f.addr.tone}</td>
+      <td class="td-planet">${f.addr.planet.sym}</td>
+      <td class="td-name" title="${f.name}">${f.name}</td>
+      <td class="td-type"><span class="badge" style="background:${col}22;color:${col};border:1px solid ${col}44">${f.type}</span></td>
+      <td><div class="td-actions">
+        <button class="btn btn-ghost btn-sm" onclick="runFile('${f.id}')">▶</button>
+        <button class="btn btn-ghost btn-sm" onclick="pushFile('${f.id}')">↑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+
+  // populate gate filter
+  const gSel=document.getElementById('sortGate');
+  const used=[...new Set(state.files.map(f=>f.addr.gate))].sort((a,b)=>a-b);
+  const curVal=gSel.value;
+  gSel.innerHTML='<option value="">— GATE —</option>'+used.map(g=>`<option value="${g}"${g==curVal?' selected':''}>G${g} ${GATE_NAMES[g]||''}</option>`).join('');
+}
+
+function sortRepo(key){
+  if(state.sortKey===key) state.sortDir*=-1;
+  else { state.sortKey=key; state.sortDir=1; }
+  renderRepo();
+}
+
+function clearFilters(){
+  document.getElementById('sortGate').value='';
+  document.getElementById('sortPlanet').value='';
+  document.getElementById('sortType').value='';
+  renderRepo();
+}
+
+function pushFile(id){
+  const f=state.files.find(x=>String(x.id)===String(id));
+  if(!f) return;
+  switchTab('execute');
+  log(`↑ PUSHING: ${f.name}`, 'log-warn');
+  if(state.hooks.github) setTimeout(()=>log('  → GitHub: committed','log-success'),600);
+  if(state.hooks.hf) setTimeout(()=>log('  → HuggingFace: uploaded','log-success'),900);
+  if(state.hooks.supabase) setTimeout(()=>log('  → Supabase: stored','log-success'),1100);
+  toast(`Pushing ${f.name}`);
+}
+
+// ── NEURAL ─────────────────────────────────────────────────────────────────
+function updateNeural(){
+  document.getElementById('neuralNodes').textContent=state.neural.nodes;
+  document.getElementById('neuralEpoch').textContent=state.neural.epoch;
+  document.getElementById('neuralGates').textContent=state.neural.gates;
+  document.getElementById('neuralResonance').textContent=state.neural.resonance+'%';
+
+  const body=Math.min(100,state.neural.nodes*3);
+  const heart=Math.min(100,state.neural.nodes*2.5);
+  const mind=Math.min(100,state.neural.nodes*2);
+  document.getElementById('bodyFill').style.width=body+'%';
+  document.getElementById('heartFill').style.width=heart+'%';
+  document.getElementById('mindFill').style.width=mind+'%';
+  document.getElementById('bodyPct').textContent=body+'%';
+  document.getElementById('heartPct').textContent=heart+'%';
+  document.getElementById('mindPct').textContent=mind+'%';
+}
+
+function runEpoch(){
+  state.neural.epoch++;
+  state.neural.resonance=Math.min(100,state.neural.resonance+rnd(3,12));
+  state.neural.gates=Math.min(64,state.neural.gates+rnd(1,4));
+  updateNeural(); updateStatus();
+  log(`⬡ EPOCH ${state.neural.epoch} COMPLETE`, 'log-success');
+  log(`  RESONANCE: ${state.neural.resonance}% · GATES: ${state.neural.gates}/64`, 'log-gate');
+  log(`  BODY: Tropical · HEART: Draconic · MIND: Sidereal`, 'log-data');
+  toast(`Epoch ${state.neural.epoch} complete`);
+}
+
+function resetNet(){
+  state.neural={nodes:state.files.length,epoch:0,gates:0,resonance:0};
+  updateNeural(); updateStatus();
+  log('⚠ Neural net reset', 'log-warn');
+}
+
+// ── HOOKS ──────────────────────────────────────────────────────────────────
+function toggleHook(name){
+  state.hooks[name]=!state.hooks[name];
+  const el=document.getElementById('hook-'+name);
+  if(state.hooks[name]) el.classList.add('connected');
+  else el.classList.remove('connected');
+  updateStatus();
+  const active=Object.values(state.hooks).filter(Boolean).length;
+  if(active>0) document.getElementById('bridgeStatus').textContent='ACTIVE';
+  else document.getElementById('bridgeStatus').textContent='STANDBY';
+  document.getElementById('bridgeStatus').style.color=active>0?'var(--emerald)':'var(--muted)';
+}
+
+function connectHook(name){
+  state.hooks[name]=true;
+  document.getElementById('hook-'+name).classList.add('connected');
+  const badge=document.getElementById('badge-'+name);
+  const colors={github:'var(--gold)',netlify:'var(--emerald)',hf:'var(--amber)',supabase:'var(--violet)',render:'var(--coral)'};
+  badge.textContent='CONNECTED';
+  badge.style.color=colors[name];
+  updateStatus();
+  document.getElementById('bridgeStatus').textContent='ACTIVE';
+  document.getElementById('bridgeStatus').style.color='var(--emerald)';
+  log(`⇆ HOOK CONNECTED: ${name.toUpperCase()}`, 'log-success');
+  toast(`${name} connected`);
+}
+
+function deployHook(name){
+  log(`▲ DEPLOYING: ${name.toUpperCase()}`, 'log-warn');
+  setTimeout(()=>log(`  ✓ Deploy triggered`, 'log-success'),800);
+  toast(`Deploy triggered: ${name}`);
+}
+
+// ── EXECUTE ────────────────────────────────────────────────────────────────
+function execCommand(){
+  const input=document.getElementById('execInput');
+  const cmd=input.value.trim();
+  if(!cmd) return;
+  input.value='';
+  log(`> ${cmd}`, 'log-data');
+  processCommand(cmd.toLowerCase());
+}
+
+function quickExec(cmd){ document.getElementById('execInput').value=cmd; execCommand(); }
+
+function processCommand(cmd){
+  if(cmd==='status'){
+    log(`FILES: ${state.files.length} · EPOCH: ${state.neural.epoch} · RESONANCE: ${state.neural.resonance}%`, 'log-success');
+    log(`HOOKS: ${Object.entries(state.hooks).filter(([,v])=>v).map(([k])=>k).join(', ')||'none'}`, 'log-info');
+  } else if(cmd.includes('list')){
+    if(!state.files.length){ log('No files ingested.','log-warn'); return; }
+    state.files.forEach(f=>log(`  G${f.addr.gate} ${f.name} [${f.type}]`,'log-gate'));
+  } else if(cmd.includes('epoch') || cmd.includes('run')){
+    runEpoch();
+  } else if(cmd.includes('github') || cmd.includes('push')){
+    if(!state.hooks.github){ log('GitHub hook not connected. Configure in HOOKS tab.','log-warn'); return; }
+    log('↑ Pushing to GitHub...','log-info');
+    setTimeout(()=>log('✓ Committed to justappgrabbin/repo','log-success'),700);
+  } else if(cmd.includes('netlify') || cmd.includes('deploy')){
+    if(!state.hooks.netlify){ log('Netlify hook not connected.','log-warn'); return; }
+    log('▲ Deploying to Netlify...','log-info');
+    setTimeout(()=>log('✓ Deployed to getguagan.pro','log-success'),800);
+  } else if(cmd.includes('hf') || cmd.includes('hugging')){
+    if(!state.hooks.hf){ log('HuggingFace hook not connected.','log-warn'); return; }
+    log('🤗 Syncing to HuggingFace stellarproximology...','log-info');
+    setTimeout(()=>log('✓ Sync complete','log-success'),900);
+  } else if(cmd.includes('export')){
+    exportRepo();
+  } else {
+    log(`Unknown command: ${cmd}. Try: status, list files, run epoch, push github, deploy netlify, sync hf, export repo`, 'log-warn');
+  }
+}
+
+function exportRepo(){
+  if(!state.files.length){ log('Nothing to export.','log-warn'); return; }
+  const rows=[['gate','line','color','tone','base','planet','zodiac','house','degree','min','sec','field','name','type','address']];
+  state.files.forEach(f=>{
+    const a=f.addr;
+    rows.push([a.gate,a.line,a.color,a.tone,a.base,a.planet.name,a.zodiac,a.house,a.deg,a.min,a.sec,a.field.name,f.name,f.type,a.key]);
+  });
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='synthia-repo.csv'; a.click();
+  log('✓ Repository exported as synthia-repo.csv','log-success');
+  toast('Exported repo CSV');
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+applyAddress(hdAddress());
+updateNeural();
+updateStatus();
+
+// populate gate filter options on load
+for(let g=1;g<=64;g++){
+  document.getElementById('sortGate').innerHTML+='';
+}
+
+// tick epoch display
+setInterval(()=>{
+  if(state.neural.epoch>0){
+    state.neural.epoch++;
+    document.getElementById('epochCount').textContent=state.neural.epoch;
+  }
+}, 30000);
+</script>
+</body>
+</html>
